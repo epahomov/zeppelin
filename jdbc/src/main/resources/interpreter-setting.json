@@ -70,6 +70,30 @@
         "defaultValue": "org.apache.hive.jdbc.HiveDriver",
         "description": ""
       },
+      "impala.url": {
+        "envName": null,
+        "propertyName": "hive.url",
+        "defaultValue": "jdbc:hive2://192.168.12.120:21050/;auth=noSasl",
+        "description": ""
+      },
+      "impala.user": {
+        "envName": null,
+        "propertyName": "hive.user",
+        "defaultValue": "hive",
+        "description": ""
+      },
+      "impala.password": {
+        "envName": null,
+        "propertyName": "hive.password",
+        "defaultValue": "",
+        "description": ""
+      },
+      "impala.driver": {
+        "envName": null,
+        "propertyName": "hive.driver",
+        "defaultValue": "org.apache.hive.jdbc.HiveDriver",
+        "description": ""
+      },
       "phoenix.url": {
         "envName": null,
         "propertyName": "phoenix.url",
