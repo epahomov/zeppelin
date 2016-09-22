@@ -293,85 +293,18 @@ public class JDBCInterpreter extends Interpreter {
   }
 
   private InterpreterResult executeSql(String propertyKey, String sql,
-      InterpreterContext interpreterContext) {
+                                       InterpreterContext interpreterContext) {
 
     String paragraphId = interpreterContext.getParagraphId();
 
     try {
-
-      Statement statement = getStatement(propertyKey, paragraphId);
-
-      if (statement == null) {
-        return new InterpreterResult(Code.ERROR, "Prefix not found.");
-      }
-      statement.setMaxRows(getMaxResult());
-
-      StringBuilder msg = null;
-      boolean isTableType = false;
-
-      if (containsIgnoreCase(sql, EXPLAIN_PREDICATE)) {
-        msg = new StringBuilder();
-      } else {
-        msg = new StringBuilder(TABLE_MAGIC_TAG);
-        isTableType = true;
-      }
-
-      ResultSet resultSet = null;
       try {
-
-        boolean isResultSetAvailable = statement.execute(sql);
-
-        if (isResultSetAvailable) {
-          resultSet = statement.getResultSet();
-
-          ResultSetMetaData md = resultSet.getMetaData();
-
-          for (int i = 1; i < md.getColumnCount() + 1; i++) {
-            if (i > 1) {
-              msg.append(TAB);
-            }
-            msg.append(replaceReservedChars(isTableType, md.getColumnName(i)));
-          }
-          msg.append(NEWLINE);
-
-          int displayRowCount = 0;
-          while (resultSet.next() && displayRowCount < getMaxResult()) {
-            for (int i = 1; i < md.getColumnCount() + 1; i++) {
-              Object resultObject;
-              String resultValue;
-              resultObject = resultSet.getObject(i);
-              if (resultObject == null) {
-                resultValue = "null";
-              } else {
-                resultValue = resultSet.getString(i);
-              }
-              msg.append(replaceReservedChars(isTableType, resultValue));
-              if (i != md.getColumnCount()) {
-                msg.append(TAB);
-              }
-            }
-            msg.append(NEWLINE);
-            displayRowCount++;
-          }
-        } else {
-          // Response contains either an update count or there are no results.
-          int updateCount = statement.getUpdateCount();
-          msg.append(UPDATE_COUNT_HEADER).append(NEWLINE);
-          msg.append(updateCount).append(NEWLINE);
-        }
-      } finally {
-        try {
-          if (resultSet != null) {
-            resultSet.close();
-          }
-          statement.close();
-        } finally {
-          statement = null;
-        }
+        return executeSqlI(propertyKey, sql, interpreterContext, paragraphId);
+      } catch (Exception e) {
+        close();
+        open();
+        return executeSqlI(propertyKey, sql, interpreterContext, paragraphId);
       }
-
-      return new InterpreterResult(Code.SUCCESS, msg.toString());
-
     } catch (Exception e) {
       logger.error("Cannot run " + sql, e);
       StringBuilder stringBuilder = new StringBuilder();
@@ -380,6 +313,82 @@ public class JDBCInterpreter extends Interpreter {
       stringBuilder.append(StringUtils.join(e.getStackTrace(), "\n"));
       return new InterpreterResult(Code.ERROR, stringBuilder.toString());
     }
+  }
+
+  private InterpreterResult executeSqlI(String propertyKey, String sql,
+                                        InterpreterContext interpreterContext, String paragraphId) throws Exception {
+    Statement statement = getStatement(propertyKey, paragraphId);
+
+    if (statement == null) {
+      return new InterpreterResult(Code.ERROR, "Prefix not found.");
+    }
+    statement.setMaxRows(getMaxResult());
+
+    StringBuilder msg = null;
+    boolean isTableType = false;
+
+    if (containsIgnoreCase(sql, EXPLAIN_PREDICATE)) {
+      msg = new StringBuilder();
+    } else {
+      msg = new StringBuilder(TABLE_MAGIC_TAG);
+      isTableType = true;
+    }
+
+    ResultSet resultSet = null;
+    try {
+
+      boolean isResultSetAvailable = statement.execute(sql);
+
+      if (isResultSetAvailable) {
+        resultSet = statement.getResultSet();
+
+        ResultSetMetaData md = resultSet.getMetaData();
+
+        for (int i = 1; i < md.getColumnCount() + 1; i++) {
+          if (i > 1) {
+            msg.append(TAB);
+          }
+          msg.append(replaceReservedChars(isTableType, md.getColumnName(i)));
+        }
+        msg.append(NEWLINE);
+
+        int displayRowCount = 0;
+        while (resultSet.next() && displayRowCount < getMaxResult()) {
+          for (int i = 1; i < md.getColumnCount() + 1; i++) {
+            Object resultObject;
+            String resultValue;
+            resultObject = resultSet.getObject(i);
+            if (resultObject == null) {
+              resultValue = "null";
+            } else {
+              resultValue = resultSet.getString(i);
+            }
+            msg.append(replaceReservedChars(isTableType, resultValue));
+            if (i != md.getColumnCount()) {
+              msg.append(TAB);
+            }
+          }
+          msg.append(NEWLINE);
+          displayRowCount++;
+        }
+      } else {
+        // Response contains either an update count or there are no results.
+        int updateCount = statement.getUpdateCount();
+        msg.append(UPDATE_COUNT_HEADER).append(NEWLINE);
+        msg.append(updateCount).append(NEWLINE);
+      }
+    } finally {
+      try {
+        if (resultSet != null) {
+          resultSet.close();
+        }
+        statement.close();
+      } finally {
+        statement = null;
+      }
+    }
+
+    return new InterpreterResult(Code.SUCCESS, msg.toString());
   }
 
   /**
