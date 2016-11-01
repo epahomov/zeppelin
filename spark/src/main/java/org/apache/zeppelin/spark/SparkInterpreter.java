@@ -381,6 +381,7 @@ public class SparkInterpreter extends Interpreter {
     }
 
     String classServerUri = null;
+    String replClassOutputDirectory = null;
 
     try { // in case of spark 1.1x, spark 1.2x
       Method classServer = intp.getClass().getMethod("classServer");
@@ -404,6 +405,16 @@ public class SparkInterpreter extends Interpreter {
       }
     }
 
+    if (classServerUri == null) {
+      try { // for RcpEnv
+        Method getClassOutputDirectory = intp.getClass().getMethod("getClassOutputDirectory");
+        File classOutputDirectory = (File) getClassOutputDirectory.invoke(intp);
+        replClassOutputDirectory = classOutputDirectory.getAbsolutePath();
+      } catch (NoSuchMethodException | SecurityException | IllegalAccessException
+              | IllegalArgumentException | InvocationTargetException e) {
+        // continue
+      }
+    }
 
     if (Utils.isScala2_11()) {
       classServer = createHttpServer(outputDir);
@@ -416,6 +427,10 @@ public class SparkInterpreter extends Interpreter {
 
     if (classServerUri != null) {
       conf.set("spark.repl.class.uri", classServerUri);
+    }
+
+    if (replClassOutputDirectory != null) {
+      conf.set("spark.repl.class.outputDir", replClassOutputDirectory);
     }
 
     if (jars.length > 0) {
@@ -600,6 +615,24 @@ public class SparkInterpreter extends Interpreter {
       argList.add(arg);
     }
 
+    DepInterpreter depInterpreter = getDepInterpreter();
+    String depInterpreterClasspath = "";
+    if (depInterpreter != null) {
+      SparkDependencyContext depc = depInterpreter.getDependencyContext();
+      if (depc != null) {
+        List<File> files = depc.getFiles();
+        if (files != null) {
+          for (File f : files) {
+            if (depInterpreterClasspath.length() > 0) {
+              depInterpreterClasspath += File.pathSeparator;
+            }
+            depInterpreterClasspath += f.getAbsolutePath();
+          }
+        }
+      }
+    }
+
+
     if (Utils.isScala2_10()) {
       scala.collection.immutable.List<String> list =
           JavaConversions.asScalaBuffer(argList).toList();
@@ -627,10 +660,22 @@ public class SparkInterpreter extends Interpreter {
       argList.add("-Yrepl-class-based");
       argList.add("-Yrepl-outdir");
       argList.add(outputDir.getAbsolutePath());
+
+      String classpath = "";
       if (conf.contains("spark.jars")) {
-        String jars = StringUtils.join(conf.get("spark.jars").split(","), File.separator);
+        classpath = StringUtils.join(conf.get("spark.jars").split(","), File.separator);
+      }
+
+      if (!depInterpreterClasspath.isEmpty()) {
+        if (!classpath.isEmpty()) {
+          classpath += File.separator;
+        }
+        classpath += depInterpreterClasspath;
+      }
+
+      if (!classpath.isEmpty()) {
         argList.add("-classpath");
-        argList.add(jars);
+        argList.add(classpath);
       }
 
       scala.collection.immutable.List<String> list =
@@ -642,6 +687,7 @@ public class SparkInterpreter extends Interpreter {
     // set classpath for scala compiler
     PathSetting pathSettings = settings.classpath();
     String classpath = "";
+
     List<File> paths = currentClassPath();
     for (File f : paths) {
       if (classpath.length() > 0) {
@@ -660,21 +706,10 @@ public class SparkInterpreter extends Interpreter {
     }
 
     // add dependency from DepInterpreter
-    DepInterpreter depInterpreter = getDepInterpreter();
-    if (depInterpreter != null) {
-      SparkDependencyContext depc = depInterpreter.getDependencyContext();
-      if (depc != null) {
-        List<File> files = depc.getFiles();
-        if (files != null) {
-          for (File f : files) {
-            if (classpath.length() > 0) {
-              classpath += File.pathSeparator;
-            }
-            classpath += f.getAbsolutePath();
-          }
-        }
-      }
+    if (classpath.length() > 0) {
+      classpath += File.pathSeparator;
     }
+    classpath += depInterpreterClasspath;
 
     // add dependency from local repo
     String localRepo = getProperty("zeppelin.interpreter.localRepo");
