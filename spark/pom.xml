@@ -48,6 +48,12 @@
           </dependency>
 
     <dependency>
+      <groupId>com.anchorfree</groupId>
+      <artifactId>udfs</artifactId>
+      <version>0.1-SNAPSHOT</version>
+    </dependency>
+
+    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>

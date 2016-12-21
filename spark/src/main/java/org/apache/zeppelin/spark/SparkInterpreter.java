@@ -236,6 +236,7 @@ public class SparkInterpreter extends Interpreter {
   private SQLContext getSQLContext_2() {
     if (sqlc == null) {
       sqlc = (SQLContext) Utils.invokeMethod(sparkSession, "sqlContext");
+      com.anchorfree.UDFs.addUDFS(sqlc);
     }
     return sqlc;
   }
@@ -249,6 +250,7 @@ public class SparkInterpreter extends Interpreter {
           hc = getClass().getClassLoader().loadClass(name)
               .getConstructor(SparkContext.class);
           sqlc = (SQLContext) hc.newInstance(getSparkContext());
+          com.anchorfree.UDFs.addUDFS(sqlc);
         } catch (NoSuchMethodException | SecurityException
             | ClassNotFoundException | InstantiationException
             | IllegalAccessException | IllegalArgumentException
